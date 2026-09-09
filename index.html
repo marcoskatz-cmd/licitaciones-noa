@@ -194,8 +194,9 @@
 <script>
 /* ------------------------------------------------------------------ config */
 var SHEET_ID = "1rRuO9riWbkwnebzwMioN5fPxDf0mtOKC5b4ec5QtWFE";
+var CB   = "__gvizLicitaciones";
 var GVIZ = "https://docs.google.com/spreadsheets/d/" + SHEET_ID +
-           "/gviz/tq?tqx=out:json&headers=1";
+           "/gviz/tq?tqx=out:json;responseHandler=" + CB + "&headers=1";
 
 /* ------------------------------------------------------------------ estado */
 var ROWS = [], VIEW = [], SORT = { k: "fecha_apertura", dir: 1 };
@@ -253,24 +254,35 @@ function relRank(r){
 }
 
 /* --------------------------------------------------------------- carga gviz */
+/* gviz no manda cabeceras CORS: hay que cargarlo como <script> (JSONP), no con
+   fetch. Como script, el navegador manda la sesion de Google del que mira, asi
+   que la planilla puede seguir siendo privada y compartida solo con INGECO. */
 function cargar(){
-  fetch(GVIZ)
-    .then(function(r){
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.text();
-    })
-    .then(function(t){
-      var i = t.indexOf("{"), j = t.lastIndexOf("}");
-      if (i < 0 || j < 0) throw new Error("respuesta inesperada");
-      var d = JSON.parse(t.slice(i, j + 1));
-      if (d.status === "error") {
-        var det = (d.errors && d.errors[0] && (d.errors[0].detailed_message || d.errors[0].message)) || "";
-        throw new Error(det.replace(/<[^>]*>/g, "") || "error de la planilla");
+  var listo = false;
+
+  window[CB] = function(d){
+    listo = true;
+    try {
+      if (!d || d.status === "error") {
+        var det = (d && d.errors && d.errors[0] &&
+                   (d.errors[0].detailed_message || d.errors[0].message)) || "";
+        throw new Error(det.replace(/<[^>]*>/g, "").trim() || "la planilla devolvio un error");
       }
       ROWS = mapear(d.table);
       init();
-    })
-    .catch(function(e){ fallo(e); });
+    } catch (e) { fallo(e); }
+  };
+
+  var s = document.createElement("script");
+  s.src = GVIZ + "&_=" + Date.now();
+  s.onerror = function(){
+    if (!listo) fallo(new Error("No se pudo cargar la planilla (sin acceso o sin conexion)."));
+  };
+  document.head.appendChild(s);
+
+  setTimeout(function(){
+    if (!listo) fallo(new Error("La planilla no respondio. Suele pasar cuando la cuenta con la que abriste el navegador no tiene acceso."));
+  }, 15000);
 }
 
 function mapear(table){
@@ -464,7 +476,7 @@ function fallo(e){
   document.getElementById("tb").innerHTML =
     '<tr><td colspan="8"><div class="msg err">No se pudieron leer los datos.<br><br>' +
     '<span style="color:var(--text-secondary);font-size:13px">' + esc(e.message) + '<br>' +
-    'Si dice que no tenés acceso, la planilla todavía no está compartida para lectura.' +
+    'La planilla se lee con tu propia cuenta de Google: si no la tenés compartida, no vas a ver nada.' +
     '</span></div></td></tr>';
   document.getElementById("tiles").innerHTML = "";
 }
