@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licitaciones viales NOA — INGECO</title>
+<style>
+  :root{
+    color-scheme: light;
+    --surface-0:#f4f4f2;
+    --surface-1:#fcfcfb;
+    --border:#dedcd6;
+    --border-soft:#e9e7e1;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --text-muted:#78766f;
+    --accent:#2a78d6;
+    --good:#0ca30c;
+    --warning:#fab219;
+    --serious:#ec835a;
+    --critical:#d03b3b;
+    --rel-alta:#1b4f8f;
+    --rel-media:#5c93cf;
+    --rel-baja:#b9cfe8;
+    --chip-bg:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-0:#111110;
+      --surface-1:#1a1a19;
+      --border:#37362f;
+      --border-soft:#2a2926;
+      --text-primary:#ffffff;
+      --text-secondary:#c3c2b7;
+      --text-muted:#96948a;
+      --accent:#3987e5;
+      --rel-alta:#8fbdf0;
+      --rel-media:#4b82c0;
+      --rel-baja:#2f4a68;
+      --chip-bg:#232320;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-0:#111110;
+    --surface-1:#1a1a19;
+    --border:#37362f;
+    --border-soft:#2a2926;
+    --text-primary:#ffffff;
+    --text-secondary:#c3c2b7;
+    --text-muted:#96948a;
+    --accent:#3987e5;
+    --rel-alta:#8fbdf0;
+    --rel-media:#4b82c0;
+    --rel-baja:#2f4a68;
+    --chip-bg:#232320;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--surface-0);color:var(--text-primary);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 18px 64px}
+
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+  h1{font-size:21px;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--text-secondary);font-size:13.5px;margin:6px 0 22px;max-width:70ch}
+  .updated{font-size:12.5px;color:var(--text-muted);white-space:nowrap}
+
+  /* ---- stat tiles ---- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+  .tile{background:var(--surface-1);border:1px solid var(--border-soft);border-radius:10px;padding:13px 15px}
+  .tile .n{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+  .tile .l{font-size:12px;color:var(--text-secondary);margin-top:3px}
+  .tile.urgente .n{color:var(--critical)}
+
+  /* ---- filtros ---- */
+  .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  select,input[type=search]{
+    font:inherit;font-size:13.5px;padding:7px 10px;border-radius:8px;
+    border:1px solid var(--border);background:var(--chip-bg);color:var(--text-primary);
+  }
+  input[type=search]{min-width:210px;flex:1 1 210px}
+  .btn{
+    font:inherit;font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--border);background:var(--chip-bg);color:var(--text-secondary);
+  }
+  .btn:hover{color:var(--text-primary)}
+
+  /* ---- tabla ---- */
+  .tablewrap{overflow-x:auto;background:var(--surface-1);border:1px solid var(--border-soft);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:900px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--border-soft);vertical-align:top}
+  th{
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);
+    font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;
+    position:sticky;top:0;background:var(--surface-1);z-index:1;
+  }
+  th:hover{color:var(--text-secondary)}
+  th .ar{opacity:.55;font-size:10px}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-0)}
+  td.obj{min-width:320px;color:var(--text-primary)}
+  td.num,td.date{white-space:nowrap;font-variant-numeric:tabular-nums}
+  td.money{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .org{color:var(--text-secondary);font-size:12.5px;margin-top:2px}
+
+  /* ---- badges ---- */
+  .b{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2.5px 8px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .rel-alta{background:color-mix(in srgb,var(--rel-alta) 14%,transparent);border-color:color-mix(in srgb,var(--rel-alta) 42%,transparent)}
+  .rel-alta .dot{background:var(--rel-alta)}
+  .rel-media{background:color-mix(in srgb,var(--rel-media) 14%,transparent);border-color:color-mix(in srgb,var(--rel-media) 42%,transparent)}
+  .rel-media .dot{background:var(--rel-media)}
+  .rel-baja{background:color-mix(in srgb,var(--rel-baja) 18%,transparent);border-color:color-mix(in srgb,var(--rel-baja) 55%,transparent)}
+  .rel-baja .dot{background:var(--rel-baja)}
+
+  .plazo{font-weight:600;font-variant-numeric:tabular-nums}
+  .p-crit{color:var(--critical)}
+  .p-warn{color:var(--serious)}
+  .p-ok{color:var(--text-secondary)}
+  .p-past{color:var(--text-muted);font-weight:400}
+
+  .est{font-size:11.5px;color:var(--text-secondary);border:1px solid var(--border);padding:2px 7px;border-radius:6px;white-space:nowrap}
+
+  .msg{padding:34px 16px;text-align:center;color:var(--text-secondary);font-size:14px}
+  .msg.err{color:var(--critical)}
+  footer{margin-top:20px;font-size:12px;color:var(--text-muted);line-height:1.7}
+  footer code{font-size:11.5px;background:var(--surface-1);padding:1px 5px;border-radius:4px;border:1px solid var(--border-soft)}
+
+  @media (max-width:640px){
+    .wrap{padding:18px 12px 48px}
+    h1{font-size:18px}
+    .tile .n{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Licitaciones viales — NOA</h1>
+    </div>
+    <div class="updated" id="updated"></div>
+  </header>
+  <p class="sub">
+    Llamados vigentes en Tucumán, Salta, Santiago del Estero, Catamarca y Jujuy, más los de
+    Vialidad Nacional con obra en la región. Se actualiza solo, de lunes a viernes.
+  </p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="filters">
+    <input type="search" id="q" placeholder="Buscar objeto, organismo, número…" aria-label="Buscar">
+    <select id="f-prov" aria-label="Provincia"><option value="">Provincia: todas</option></select>
+    <select id="f-rubro" aria-label="Rubro"><option value="">Rubro: todos</option></select>
+    <select id="f-rel" aria-label="Relevancia"><option value="">Relevancia: toda</option></select>
+    <select id="f-plazo" aria-label="Plazo">
+      <option value="abiertas">Solo abiertas</option>
+      <option value="">Todas</option>
+      <option value="15">Cierran en 15 días</option>
+      <option value="7">Cierran en 7 días</option>
+    </select>
+    <button class="btn" id="reset" type="button">Limpiar</button>
+  </div>
+
+  <div class="tablewrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-k="fecha_apertura">Apertura <span class="ar"></span></th>
+          <th data-k="_dias">Plazo <span class="ar"></span></th>
+          <th data-k="objeto">Objeto / organismo <span class="ar"></span></th>
+          <th data-k="provincia_obra">Provincia <span class="ar"></span></th>
+          <th data-k="rubro">Rubro <span class="ar"></span></th>
+          <th data-k="_pres">Presupuesto oficial <span class="ar"></span></th>
+          <th data-k="_rel">Relevancia <span class="ar"></span></th>
+          <th data-k="estado_seguimiento">Estado <span class="ar"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tb"><tr><td colspan="8"><div class="msg">Cargando…</div></td></tr></tbody>
+    </table>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ config */
+var SHEET_ID = "1rRuO9riWbkwnebzwMioN5fPxDf0mtOKC5b4ec5QtWFE";
+var GVIZ = "https://docs.google.com/spreadsheets/d/" + SHEET_ID +
+           "/gviz/tq?tqx=out:json&headers=1";
+
+/* ------------------------------------------------------------------ estado */
+var ROWS = [], VIEW = [], SORT = { k: "fecha_apertura", dir: 1 };
+
+/* --------------------------------------------------------------- utilidades */
+function txt(v){ return (v === null || v === undefined) ? "" : String(v).trim(); }
+function esc(s){
+  return txt(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function hoy(){ var d = new Date(); d.setHours(0,0,0,0); return d; }
+
+/* Acepta ISO (2026-09-30), d/m/aaaa y Date(a,m,d) de gviz. */
+function parseFecha(v){
+  if (v instanceof Date) { var c = new Date(v); c.setHours(0,0,0,0); return c; }
+  var s = txt(v); if (!s) return null;
+  var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/Date\((\d+),(\d+),(\d+)/);
+  if (m) return new Date(+m[1], +m[2], +m[3]);
+  return null;
+}
+function fmtFecha(d){
+  if (!d) return "—";
+  var p = function(n){ return n < 10 ? "0"+n : ""+n; };
+  return p(d.getDate()) + "/" + p(d.getMonth()+1) + "/" + d.getFullYear();
+}
+function dias(d){
+  if (!d) return null;
+  return Math.round((d - hoy()) / 86400000);
+}
+function numero(v){
+  var s = txt(v); if (!s) return null;
+  s = s.replace(/[^\d,.\-]/g, "");
+  if (!s) return null;
+  // formato argentino: 1.234.567,89
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(/,/g, "");
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function fmtMoneda(n, mon){
+  if (n === null) return "—";
+  var s = n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
+  var m = txt(mon).toUpperCase();
+  var pre = (m === "USD" || m === "U$S") ? "US$ " : "$ ";
+  return pre + s;
+}
+function relRank(r){
+  r = txt(r).toLowerCase();
+  return r === "alta" ? 3 : r === "media" ? 2 : r === "baja" ? 1 : 0;
+}
+
+/* --------------------------------------------------------------- carga gviz */
+function cargar(){
+  fetch(GVIZ)
+    .then(function(r){
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.text();
+    })
+    .then(function(t){
+      var i = t.indexOf("{"), j = t.lastIndexOf("}");
+      if (i < 0 || j < 0) throw new Error("respuesta inesperada");
+      var d = JSON.parse(t.slice(i, j + 1));
+      if (d.status === "error") {
+        var det = (d.errors && d.errors[0] && (d.errors[0].detailed_message || d.errors[0].message)) || "";
+        throw new Error(det.replace(/<[^>]*>/g, "") || "error de la planilla");
+      }
+      ROWS = mapear(d.table);
+      init();
+    })
+    .catch(function(e){ fallo(e); });
+}
+
+function mapear(table){
+  var cols = (table.cols || []).map(function(c){
+    return txt(c.label || c.id).toLowerCase().replace(/\s+/g, "_");
+  });
+  var out = [];
+  (table.rows || []).forEach(function(r){
+    var o = {};
+    (r.c || []).forEach(function(cell, k){
+      var key = cols[k] || ("c" + k);
+      var v = cell ? (cell.f !== undefined && cell.f !== null ? cell.f : cell.v) : "";
+      o[key] = v;
+    });
+    // descarta la fila de inicialización y las vacías
+    if (txt(o.fuente).toLowerCase() === "inicializacion") return;
+    if (!txt(o.objeto) && !txt(o.organismo)) return;
+    o._fa   = parseFecha(o.fecha_apertura);
+    o._dias = dias(o._fa);
+    o._pres = numero(o.presupuesto_oficial);
+    o._rel  = relRank(o.relevancia);
+    out.push(o);
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------- filtros */
+function opciones(sel, vals, etiqueta){
+  var el = document.getElementById(sel);
+  vals.filter(Boolean).sort(function(a,b){ return a.localeCompare(b, "es"); })
+      .forEach(function(v){
+        var o = document.createElement("option");
+        o.value = v; o.textContent = v;
+        el.appendChild(o);
+      });
+}
+function unicos(k){
+  var s = {}; ROWS.forEach(function(r){ var v = txt(r[k]); if (v) s[v] = 1; });
+  return Object.keys(s);
+}
+
+function aplicar(){
+  var q     = txt(document.getElementById("q").value).toLowerCase();
+  var prov  = document.getElementById("f-prov").value;
+  var rubro = document.getElementById("f-rubro").value;
+  var rel   = document.getElementById("f-rel").value;
+  var plazo = document.getElementById("f-plazo").value;
+
+  VIEW = ROWS.filter(function(r){
+    if (prov  && txt(r.provincia_obra) !== prov) return false;
+    if (rubro && txt(r.rubro) !== rubro) return false;
+    if (rel   && txt(r.relevancia).toLowerCase() !== rel.toLowerCase()) return false;
+    if (plazo === "abiertas" && r._dias !== null && r._dias < 0) return false;
+    if (plazo === "15" && !(r._dias !== null && r._dias >= 0 && r._dias <= 15)) return false;
+    if (plazo === "7"  && !(r._dias !== null && r._dias >= 0 && r._dias <= 7))  return false;
+    if (q) {
+      var hay = [r.objeto, r.organismo, r.numero, r.notas, r.provincia_obra, r.rubro]
+                .map(txt).join(" ").toLowerCase();
+      if (hay.indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+
+  ordenar();
+  pintar();
+  tiles();
+}
+
+function ordenar(){
+  var k = SORT.k, dir = SORT.dir;
+  VIEW.sort(function(a, b){
+    var x = a[k], y = b[k];
+    if (k === "fecha_apertura") { x = a._fa ? a._fa.getTime() : Infinity; y = b._fa ? b._fa.getTime() : Infinity; }
+    if (x === null || x === undefined || x === "") x = (typeof y === "number") ? Infinity : "";
+    if (y === null || y === undefined || y === "") y = (typeof x === "number") ? Infinity : "";
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    return txt(x).localeCompare(txt(y), "es") * dir;
+  });
+}
+
+/* -------------------------------------------------------------------- render */
+function claseDias(d){
+  if (d === null) return "p-ok";
+  if (d < 0) return "p-past";
+  if (d <= 7) return "p-crit";
+  if (d <= 15) return "p-warn";
+  return "p-ok";
+}
+function textoDias(d){
+  if (d === null) return "—";
+  if (d < 0) return "cerrada";
+  if (d === 0) return "hoy";
+  if (d === 1) return "1 día";
+  return d + " días";
+}
+
+function pintar(){
+  var tb = document.getElementById("tb");
+  if (!VIEW.length) {
+    tb.innerHTML = '<tr><td colspan="8"><div class="msg">Sin llamados que coincidan con el filtro.</div></td></tr>';
+    return;
+  }
+  var html = VIEW.map(function(r){
+    var rel = txt(r.relevancia).toLowerCase();
+    var relCls = rel === "alta" ? "rel-alta" : rel === "media" ? "rel-media" : "rel-baja";
+    var obj = esc(r.objeto) || "—";
+    var url = txt(r.url);
+    var objHtml = url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + obj + '</a>' : obj;
+    var org = [txt(r.organismo), txt(r.numero)].filter(Boolean).join(" · ");
+    return '<tr>' +
+      '<td class="date">' + fmtFecha(r._fa) + '</td>' +
+      '<td class="num plazo ' + claseDias(r._dias) + '">' + textoDias(r._dias) + '</td>' +
+      '<td class="obj">' + objHtml + (org ? '<div class="org">' + esc(org) + '</div>' : '') + '</td>' +
+      '<td>' + (esc(r.provincia_obra) || "—") + '</td>' +
+      '<td>' + (esc(r.rubro) || "—") + '</td>' +
+      '<td class="money">' + fmtMoneda(r._pres, r.moneda) + '</td>' +
+      '<td>' + (rel ? '<span class="b ' + relCls + '"><span class="dot"></span>' + esc(r.relevancia) + '</span>' : "—") + '</td>' +
+      '<td>' + (txt(r.estado_seguimiento) ? '<span class="est">' + esc(r.estado_seguimiento) + '</span>' : "—") + '</td>' +
+    '</tr>';
+  }).join("");
+  tb.innerHTML = html;
+}
+
+function tiles(){
+  var abiertas = ROWS.filter(function(r){ return r._dias === null || r._dias >= 0; });
+  var d15 = abiertas.filter(function(r){ return r._dias !== null && r._dias <= 15; });
+  var alta = abiertas.filter(function(r){ return relRank(r.relevancia) === 3; });
+  var nuevas = ROWS.filter(function(r){
+    return txt(r.estado_seguimiento).toLowerCase() === "nuevo" && (r._dias === null || r._dias >= 0);
+  });
+  var t = [
+    { n: abiertas.length, l: "Llamados abiertos" },
+    { n: d15.length,      l: "Cierran en 15 días", cls: d15.length ? "urgente" : "" },
+    { n: alta.length,     l: "Relevancia alta" },
+    { n: nuevas.length,   l: "Sin revisar" },
+    { n: VIEW.length,     l: "En la vista actual" }
+  ];
+  document.getElementById("tiles").innerHTML = t.map(function(x){
+    return '<div class="tile ' + (x.cls || "") + '"><div class="n">' + x.n + '</div><div class="l">' + x.l + '</div></div>';
+  }).join("");
+}
+
+/* ---------------------------------------------------------------------- init */
+function init(){
+  opciones("f-prov",  unicos("provincia_obra"));
+  opciones("f-rubro", unicos("rubro"));
+  ["alta","media","baja"].forEach(function(v){
+    var o = document.createElement("option"); o.value = v; o.textContent = v;
+    document.getElementById("f-rel").appendChild(o);
+  });
+
+  ["q","f-prov","f-rubro","f-rel","f-plazo"].forEach(function(id){
+    var el = document.getElementById(id);
+    el.addEventListener(id === "q" ? "input" : "change", aplicar);
+  });
+  document.getElementById("reset").addEventListener("click", function(){
+    document.getElementById("q").value = "";
+    ["f-prov","f-rubro","f-rel"].forEach(function(i){ document.getElementById(i).value = ""; });
+    document.getElementById("f-plazo").value = "abiertas";
+    aplicar();
+  });
+
+  document.querySelectorAll("th[data-k]").forEach(function(th){
+    th.addEventListener("click", function(){
+      var k = th.getAttribute("data-k");
+      SORT.dir = (SORT.k === k) ? -SORT.dir : 1;
+      SORT.k = k;
+      document.querySelectorAll("th .ar").forEach(function(a){ a.textContent = ""; });
+      th.querySelector(".ar").textContent = SORT.dir > 0 ? "▲" : "▼";
+      ordenar(); pintar();
+    });
+  });
+
+  var d = new Date();
+  document.getElementById("updated").textContent =
+    "Datos leídos " + fmtFecha(d) + " " +
+    (d.getHours() < 10 ? "0" : "") + d.getHours() + ":" +
+    (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
+
+  document.getElementById("foot").innerHTML =
+    "Fuente: boletines oficiales de la Nación y de las provincias del NOA. " +
+    "El seguimiento lo actualiza una tarea automática de lunes a viernes; la columna " +
+    "<code>estado_seguimiento</code> se edita a mano en la planilla. " +
+    "Los campos vacíos son datos que no figuran en el aviso original — no se estiman.";
+
+  document.getElementById("f-plazo").value = "abiertas";
+  aplicar();
+}
+
+function fallo(e){
+  document.getElementById("tb").innerHTML =
+    '<tr><td colspan="8"><div class="msg err">No se pudieron leer los datos.<br><br>' +
+    '<span style="color:var(--text-secondary);font-size:13px">' + esc(e.message) + '<br>' +
+    'Si dice que no tenés acceso, la planilla todavía no está compartida para lectura.' +
+    '</span></div></td></tr>';
+  document.getElementById("tiles").innerHTML = "";
+}
+
+cargar();
+</script>
+</body>
+</html>
