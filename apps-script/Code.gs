@@ -8,6 +8,8 @@
  * POST (JSON):
  *   { "token": "...", "filas": [ { "organismo": "...", "numero": "...", ... } ] }
  *   → { "ok": true, "agregadas": n, "duplicadas": m, "descartadas": [...] }
+ *   Con "simular": true no escribe nada: devuelve lo mismo más "previa" (las
+ *   filas que habría agregado). Sirve para probar la conexión y el formato.
  *
  * Primera vez (sin token configurado todavía):
  *   { "accion": "configurar", "token": "..." }  → guarda el token. Solo funciona
@@ -141,6 +143,10 @@ function doPost(e) {
       nuevas.push(enc.cols.map(function (c) { return c ? txt_(o[c]) : ""; }));
     });
 
+    if (body.simular) {
+      return json_({ ok: true, simulado: true, agregadas: nuevas.length, duplicadas: duplicadas,
+                     descartadas: descartadas, previa: nuevas });
+    }
     if (nuevas.length) {
       sh.getRange(sh.getLastRow() + 1, 1, nuevas.length, enc.cols.length).setValues(nuevas);
     }
