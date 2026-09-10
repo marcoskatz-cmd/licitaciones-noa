@@ -27,11 +27,14 @@ pone `nuevo`.
 ## Ejemplo con curl
 
 ```bash
-curl -sL -X POST "$URL" -H "Content-Type: application/json" \
+curl -sL "$URL" -H "Content-Type: application/json" \
   -d '{"token":"'"$TOKEN"'","filas":[{"organismo":"DPV Jujuy","numero":"CP 12/2026","objeto":"Bacheo RP 1","provincia_obra":"Jujuy","fecha_apertura":"2026-09-30","relevancia":"alta","fuente":"vialidad.jujuy.gob.ar","url":"https://..."}]}'
 ```
 
 `-L` es obligatorio: Apps Script redirige a `script.googleusercontent.com`.
+**No usar `-X POST`**: con `-X` curl repite el POST sin cuerpo en la redirección y
+Google devuelve un error 411 (aunque la fila sí se haya guardado). Sin `-X`, `-d`
+ya hace el POST y la redirección se sigue como GET, que es lo que trae el JSON.
 
 ## Deploy (clasp, nunca copy-paste)
 
