@@ -63,6 +63,28 @@ function doGet(e) {
   try {
     var sh = hoja_();
     var enc = encabezados_(sh);
+    var p = (e && e.parameter) || {};
+
+    // ?datos=1 → todas las filas como objetos {columna: valor}. Lo usa el panel
+    // (GitHub Pages): la planilla queda privada y la lee este script como dueño.
+    if (p.datos) {
+      var n = sh.getLastRow(), filas = [];
+      if (n > 1) {
+        var vals = sh.getRange(2, 1, n - 1, enc.cols.length).getValues();
+        vals.forEach(function (r) {
+          var o = {};
+          enc.cols.forEach(function (c, i) {
+            var v = r[i];
+            if (v instanceof Date) v = Utilities.formatDate(v, "America/Argentina/Tucuman", "yyyy-MM-dd");
+            if (c) o[c] = txt_(v);
+          });
+          if (txt_(o.objeto) || txt_(o.organismo)) filas.push(o);
+        });
+      }
+      return json_({ ok: true, columnas: enc.cols, faltan: enc.faltan, filas: filas,
+                     actualizado: new Date().toISOString() });
+    }
+
     return json_({
       ok: enc.faltan.length === 0,
       columnas: enc.cols,
