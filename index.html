@@ -322,7 +322,7 @@ function aplicar(){
     if (prov  && txt(r.provincia_obra) !== prov) return false;
     if (rubro && txt(r.rubro) !== rubro) return false;
     if (rel   && txt(r.relevancia).toLowerCase() !== rel.toLowerCase()) return false;
-    if (plazo === "abiertas" && r._dias !== null && r._dias < 0) return false;
+    if (plazo === "abiertas" && !abierta(r)) return false;
     if (plazo === "15" && !(r._dias !== null && r._dias >= 0 && r._dias <= 15)) return false;
     if (plazo === "7"  && !(r._dias !== null && r._dias >= 0 && r._dias <= 7))  return false;
     if (q) {
@@ -393,12 +393,19 @@ function pintar(){
   tb.innerHTML = html;
 }
 
+// Abierta = apertura futura o sin fecha, salvo que el estado (editado a mano en la
+// planilla) diga descartado / cerrado / adjudicado / vencido.
+function abierta(r){
+  var e = txt(r.estado_seguimiento).toLowerCase();
+  if (/^(descart|cerr|adjudic|venc)/.test(e)) return false;
+  return r._dias === null || r._dias >= 0;
+}
 function tiles(){
-  var abiertas = ROWS.filter(function(r){ return r._dias === null || r._dias >= 0; });
+  var abiertas = ROWS.filter(abierta);
   var d15 = abiertas.filter(function(r){ return r._dias !== null && r._dias <= 15; });
   var alta = abiertas.filter(function(r){ return relRank(r.relevancia) === 3; });
   var nuevas = ROWS.filter(function(r){
-    return txt(r.estado_seguimiento).toLowerCase() === "nuevo" && (r._dias === null || r._dias >= 0);
+    return txt(r.estado_seguimiento).toLowerCase() === "nuevo" && abierta(r);
   });
   var t = [
     { n: abiertas.length, l: "Llamados abiertos" },
