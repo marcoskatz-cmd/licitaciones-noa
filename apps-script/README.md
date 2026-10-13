@@ -11,6 +11,7 @@ descarta duplicados y avisa si la planilla cambió de forma.
 |---|---|---|
 | `GET` | — | `{ ok, columnas, faltan, filas, token_configurado }` (diagnóstico, sin datos) |
 | `POST` | `{ "token": "...", "filas": [ {…}, … ] }` | `{ ok, agregadas, duplicadas, descartadas }` |
+| `POST` | `{ "token": "...", "accion": "actualizar", "filas": [ {"organismo","numero", …} ] }` | Completa filas existentes: ubica por `organismo`+`numero` (exacto o `numero` contenido) y pisa solo los campos que vienen con valor. `{ ok, actualizadas, sin_match, cambios }`. Acepta `"simular": true`. |
 | `POST` | `{ "accion": "configurar", "token": "..." }` | Guarda el token. **Solo funciona una vez** (mientras no haya token). |
 
 Cada objeto de `filas` usa los nombres de columna de la planilla

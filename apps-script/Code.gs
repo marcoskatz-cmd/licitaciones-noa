@@ -11,6 +11,9 @@
  *   Con "simular": true no escribe nada: devuelve lo mismo más "previa" (las
  *   filas que habría agregado). Sirve para probar la conexión y el formato.
  *
+ * Con "accion": "actualizar" no agrega: ubica cada fila por organismo+numero
+ *   y pisa solo los campos que vienen con valor (ver actualizar_).
+ *
  * Primera vez (sin token configurado todavía):
  *   { "accion": "configurar", "token": "..." }  → guarda el token. Solo funciona
  *   una vez; después de eso cualquier intento devuelve error.
@@ -135,6 +138,8 @@ function doPost(e) {
       return json_({ ok: false, error: "A la planilla le faltan columnas", faltan: enc.faltan });
     }
 
+    if (body.accion === "actualizar") return actualizar_(sh, enc, filas, !!body.simular);
+
     // Indice de lo ya cargado para no duplicar.
     var existentes = [];
     var n = sh.getLastRow();
@@ -178,6 +183,52 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * accion "actualizar": completa filas ya cargadas (por ejemplo las que
+ * quedaron con objeto en blanco porque el boletin no se pudo leer).
+ * Cada fila trae "organismo" y "numero" para ubicar la existente; el resto
+ * de las claves pisa esa celda. Se busca por organismo+numero exactos
+ * (normalizados) y, si no hay, por organismo igual y numero contenido en el
+ * cargado (asi "93/2026" encuentra "Direccion de Vialidad de Salta N 93/2026").
+ * Nunca crea filas ni borra celdas: una clave con valor vacio se ignora.
+ */
+function actualizar_(sh, enc, filas, simular) {
+  var n = sh.getLastRow();
+  var existentes = n > 1 ? sh.getRange(2, 1, n - 1, enc.cols.length).getValues() : [];
+  var iOrg = enc.cols.indexOf("organismo"), iNum = enc.cols.indexOf("numero");
+  var actualizadas = 0, sinMatch = [], cambios = [];
+
+  filas.forEach(function (f, idx) {
+    if (!f || typeof f !== "object") { sinMatch.push({ fila: idx, motivo: "no es un objeto" }); return; }
+    var o = {};
+    Object.keys(f).forEach(function (k) { o[norm_(k).replace(/ /g, "_")] = f[k]; });
+    var org = norm_(o.organismo), num = norm_(o.numero);
+    if (!org || !num) { sinMatch.push({ fila: idx, motivo: "faltan organismo o numero" }); return; }
+
+    var r = -1;
+    for (var i = 0; i < existentes.length && r < 0; i++) {
+      if (norm_(existentes[i][iOrg]) === org && norm_(existentes[i][iNum]) === num) r = i;
+    }
+    for (var j = 0; j < existentes.length && r < 0; j++) {
+      if (norm_(existentes[j][iOrg]) === org && norm_(existentes[j][iNum]).indexOf(num) >= 0) r = j;
+    }
+    if (r < 0) { sinMatch.push({ fila: idx, motivo: "no existe", organismo: o.organismo, numero: o.numero }); return; }
+
+    var tocadas = [];
+    enc.cols.forEach(function (c, ci) {
+      if (!c || c === "organismo" || c === "numero") return;
+      if (!(c in o) || !txt_(o[c])) return;
+      if (!simular) sh.getRange(r + 2, ci + 1).setValue(txt_(o[c]));
+      existentes[r][ci] = txt_(o[c]);
+      tocadas.push(c);
+    });
+    actualizadas++;
+    cambios.push({ fila_planilla: r + 2, numero: txt_(existentes[r][iNum]), campos: tocadas });
+  });
+
+  return json_({ ok: true, simulado: !!simular, actualizadas: actualizadas, sin_match: sinMatch, cambios: cambios });
 }
 
 /** Claves de duplicado: (organismo+numero) y (objeto+fecha_apertura). */
