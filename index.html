@@ -163,6 +163,14 @@
     <select id="f-prov" aria-label="Provincia"><option value="">Provincia: todas</option></select>
     <select id="f-rubro" aria-label="Rubro"><option value="">Rubro: todos</option></select>
     <select id="f-rel" aria-label="Relevancia"><option value="">Relevancia: toda</option></select>
+    <select id="f-monto" aria-label="Monto mínimo">
+      <option value="20000000">Desde $ 20 M</option>
+      <option value="50000000">Desde $ 50 M</option>
+      <option value="100000000">Desde $ 100 M</option>
+      <option value="500000000">Desde $ 500 M</option>
+      <option value="1000000000">Desde $ 1.000 M</option>
+      <option value="0">Cualquier monto</option>
+    </select>
     <select id="f-plazo" aria-label="Plazo">
       <option value="abiertas">Solo abiertas</option>
       <option value="">Todas</option>
@@ -319,8 +327,10 @@ function aplicar(){
   var rubro = document.getElementById("f-rubro").value;
   var rel   = document.getElementById("f-rel").value;
   var plazo = document.getElementById("f-plazo").value;
+  var monto = Number(document.getElementById("f-monto").value) || 0;
 
   VIEW = ROWS.filter(function(r){
+    if (!pasaMonto(r, monto)) return false;
     if (prov  && txt(r.provincia_obra) !== prov) return false;
     if (rubro && txt(r.rubro) !== rubro) return false;
     if (rel   && txt(r.relevancia).toLowerCase() !== rel.toLowerCase()) return false;
@@ -402,11 +412,19 @@ function abierta(r){
   if (/^(descart|cerr|adjudic|venc)/.test(e)) return false;
   return r._dias === null || r._dias >= 0;
 }
+// Un llamado pasa el filtro de monto si su presupuesto llega al mínimo o si no
+// tiene presupuesto publicado (no se descarta lo que no se conoce).
+function pasaMonto(r, min){
+  if (!min) return true;
+  return r._pres === null || r._pres >= min;
+}
 function tiles(){
-  var abiertas = ROWS.filter(abierta);
+  var min = Number(document.getElementById("f-monto").value) || 0;
+  var base = ROWS.filter(function(r){ return pasaMonto(r, min); });
+  var abiertas = base.filter(abierta);
   var d15 = abiertas.filter(function(r){ return r._dias !== null && r._dias <= 15; });
   var alta = abiertas.filter(function(r){ return relRank(r.relevancia) === 3; });
-  var nuevas = ROWS.filter(function(r){
+  var nuevas = base.filter(function(r){
     return txt(r.estado_seguimiento).toLowerCase() === "nuevo" && abierta(r);
   });
   var t = [
@@ -430,7 +448,7 @@ function init(){
     document.getElementById("f-rel").appendChild(o);
   });
 
-  ["q","f-prov","f-rubro","f-rel","f-plazo"].forEach(function(id){
+  ["q","f-prov","f-rubro","f-rel","f-plazo","f-monto"].forEach(function(id){
     var el = document.getElementById(id);
     el.addEventListener(id === "q" ? "input" : "change", aplicar);
   });
@@ -438,6 +456,7 @@ function init(){
     document.getElementById("q").value = "";
     ["f-prov","f-rubro","f-rel"].forEach(function(i){ document.getElementById(i).value = ""; });
     document.getElementById("f-plazo").value = "abiertas";
+    document.getElementById("f-monto").value = "20000000";
     aplicar();
   });
 
@@ -462,9 +481,10 @@ function init(){
     "Fuente: boletines oficiales de la Nación y de las provincias del NOA. " +
     "El seguimiento lo actualiza una tarea automática de lunes a viernes; la columna " +
     "<code>estado_seguimiento</code> se edita a mano en la planilla. " +
-    "Los campos vacíos son datos que no figuran en el aviso original — no se estiman.";
+    "Los llamados con presupuesto menor a $ 20 M no se cargan; los que no publican monto se muestran igual (\"sin publicar\").";
 
   document.getElementById("f-plazo").value = "abiertas";
+  document.getElementById("f-monto").value = "20000000";
   aplicar();
 }
 
