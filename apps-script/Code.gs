@@ -264,6 +264,16 @@ function verificar() {
     tokenGuardado_() ? "configurado" : "PENDIENTE");
 }
 
+/**
+ * Correr UNA vez desde el editor para autorizar el permiso de red
+ * (script.external_request) que usa el reenvio ?smt=1.
+ */
+function probarSMT() {
+  var r = UrlFetchApp.fetch("https://estadisticas.smt.gob.ar:5001/admin/listarContratacion",
+                            { muteHttpExceptions: true, validateHttpsCertificates: false });
+  Logger.log("HTTP %s, %s bytes", r.getResponseCode(), r.getContentText().length);
+}
+
 /** Por si hay que rotar el token: borra el actual, despues se vuelve a 'configurar' por POST. */
 function borrarToken() {
   PropertiesService.getScriptProperties().deleteProperty("TOKEN");
