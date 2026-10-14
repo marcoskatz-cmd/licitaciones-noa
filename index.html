@@ -139,6 +139,7 @@
     h1{font-size:18px}
     .tile .n{font-size:22px}
   }
+  .sinpres{color:#b8860b;font-size:.85em;font-style:italic;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -240,7 +241,7 @@ function numero(v){
   return isNaN(n) ? null : n;
 }
 function fmtMoneda(n, mon){
-  if (n === null) return "—";
+  if (n === null) return '<span class="sinpres" title="El organismo no publicó el presupuesto oficial">sin publicar</span>';
   var s = n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
   var m = txt(mon).toUpperCase();
   var pre = (m === "USD" || m === "U$S") ? "US$ " : "$ ";
