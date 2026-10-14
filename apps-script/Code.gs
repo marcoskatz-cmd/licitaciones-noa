@@ -88,6 +88,17 @@ function doGet(e) {
                      actualizado: new Date().toISOString() });
     }
 
+    // ?smt=1 → reenvia la API de contrataciones de la Municipalidad de San Miguel
+    // de Tucuman. La rutina cloud no llega a ese host (puerto 5001, conexion
+    // reseteada por el proxy de salida); Apps Script si.
+    if (p.smt) {
+      var r = UrlFetchApp.fetch("https://estadisticas.smt.gob.ar:5001/admin/listarContratacion",
+                                { muteHttpExceptions: true, validateHttpsCertificates: false });
+      var out = ContentService.createTextOutput(r.getContentText());
+      out.setMimeType(ContentService.MimeType.JSON);
+      return out;
+    }
+
     return json_({
       ok: enc.faltan.length === 0,
       columnas: enc.cols,
