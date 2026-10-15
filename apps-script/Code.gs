@@ -187,6 +187,7 @@ function doPost(e) {
     }
     if (nuevas.length) {
       sh.getRange(sh.getLastRow() + 1, 1, nuevas.length, enc.cols.length).setValues(nuevas);
+      try { avisarNuevas_(nuevas, enc.cols); } catch (eAv) { console.warn('aviso app INGECO: ' + eAv); }
     }
     return json_({ ok: true, agregadas: nuevas.length, duplicadas: duplicadas, descartadas: descartadas });
   } catch (err) {
@@ -278,4 +279,34 @@ function probarSMT() {
 function borrarToken() {
   PropertiesService.getScriptProperties().deleteProperty("TOKEN");
   Logger.log("Token borrado");
+}
+
+
+/* ------------------------------------------------ Avisos por la app INGECO */
+var APP_INGECO_BACKEND_ = 'https://script.google.com/macros/s/AKfycbx9NN1FfOQjUjfymLXrMyd2QM6l96HP0lxY6RC7_xKsbDlO0PnwdHbaMtag54VYFor0/exec';
+var PANEL_URL_ = 'https://marcoskatz-cmd.github.io/licitaciones-noa/';
+
+/** Un aviso por cada licitación nueva, a todos los que tienen el módulo Licitaciones (y admins). */
+function avisarNuevas_(nuevas, cols) {
+  var clave = PropertiesService.getScriptProperties().getProperty('CLAVE_LICITACIONES');
+  if (!clave) return;
+  var ix = function (c) { return cols.indexOf(c); };
+  nuevas.forEach(function (r) {
+    var objeto = r[ix('objeto')] || '(sin objeto)', org = r[ix('organismo')] || '', num = r[ix('numero')] || '';
+    var apertura = r[ix('fecha_apertura')] || '', pres = r[ix('presupuesto_oficial')] || '', mon = r[ix('moneda')] || '';
+    var prov = r[ix('provincia_obra')] || '', url = r[ix('url')] || '';
+    var titulo = 'Licitación nueva: ' + String(objeto).slice(0, 90);
+    var cuerpo = [org + (num ? ' · ' + num : ''), prov, apertura ? 'Apertura ' + apertura : '', pres ? 'Presupuesto ' + (mon ? mon + ' ' : '$') + pres : ''].filter(Boolean).join(' · ');
+    try {
+      UrlFetchApp.fetch(APP_INGECO_BACKEND_, {
+        method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true,
+        payload: JSON.stringify({
+          accion: 'notificar', clave_sistema: clave, modulo: 'LICITACIONES',
+          destinatarios: [{ con_modulo: 'LICITACIONES' }, { admin: true }], tipo: 'aviso_general', prioridad: 'normal',
+          titulo: titulo, cuerpo: cuerpo, url_destino: url || PANEL_URL_,
+          clave_unica: 'lic-' + norm_(org) + '|' + norm_(num || objeto), dias_unica: 365
+        })
+      });
+    } catch (e) { console.warn('aviso licitación: ' + e); }
+  });
 }
