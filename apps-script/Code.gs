@@ -1,312 +1,33 @@
 /**
- * API de escritura para la planilla "Licitaciones viales NOA — seguimiento".
+ * Reenvío: lo que queda en el Apps Script de un sistema DESPUÉS de pasarlo a la plataforma.
  *
- * La rutina diaria de Claude (cloud) no puede escribir en Sheets con el
- * conector de Drive, así que hace un POST acá. Este script agrega filas,
- * descarta duplicados y avisa si la planilla cambió de forma.
+ * La dirección vieja (…/exec) sigue existiendo y reenvía cada pedido a la plataforma, que es la única que
+ * guarda datos. Sirve para todo lo que todavía apunta a la dirección vieja: celulares con la app guardada,
+ * rutinas en la nube, otros sistemas que no se migraron.
  *
- * POST (JSON):
- *   { "token": "...", "filas": [ { "organismo": "...", "numero": "...", ... } ] }
- *   → { "ok": true, "agregadas": n, "duplicadas": m, "descartadas": [...] }
- *   Con "simular": true no escribe nada: devuelve lo mismo más "previa" (las
- *   filas que habría agregado). Sirve para probar la conexión y el formato.
+ * Volver atrás: volver a desplegar la versión anterior del script en el mismo despliegue
+ * (clasp deploy -i <id del despliegue> -V <versión anterior>) y restaurar la URL en el frontend.
  *
- * Con "accion": "actualizar" no agrega: ubica cada fila por organismo+numero
- *   y pisa solo los campos que vienen con valor (ver actualizar_).
- *
- * Primera vez (sin token configurado todavía):
- *   { "accion": "configurar", "token": "..." }  → guarda el token. Solo funciona
- *   una vez; después de eso cualquier intento devuelve error.
- *
- * GET  → { "ok": true, "columnas": [...], "filas": n }  (diagnóstico, sin datos)
+ * Al desplegar se reemplaza https://ingeco-plataforma.vercel.app/api/licitaciones por la URL del sistema en la plataforma.
  */
+var DESTINO = 'https://ingeco-plataforma.vercel.app/api/licitaciones';
 
-var SHEET_ID = "1rRuO9riWbkwnebzwMioN5fPxDf0mtOKC5b4ec5QtWFE";
-var HOJA = "Hoja 1";
+function doGet(e) { return reenviar_('get', e); }
+function doPost(e) { return reenviar_('post', e); }
 
-var COLUMNAS = [
-  "fecha_deteccion", "fuente", "jurisdiccion", "organismo", "numero", "objeto",
-  "provincia_obra", "rubro", "presupuesto_oficial", "moneda", "fecha_apertura",
-  "plazo_obra", "url", "relevancia", "notas", "estado_seguimiento"
-];
-
-/* ------------------------------------------------------------------ util */
-
-function json_(obj, code) {
-  var out = ContentService.createTextOutput(JSON.stringify(obj));
-  out.setMimeType(ContentService.MimeType.JSON);
-  return out;
-}
-
-function txt_(v) { return (v === null || v === undefined) ? "" : String(v).trim(); }
-function norm_(v) { return txt_(v).toLowerCase().replace(/\s+/g, " "); }
-
-function hoja_() {
-  var ss = SpreadsheetApp.openById(SHEET_ID);
-  var sh = ss.getSheetByName(HOJA) || ss.getSheets()[0];
-  return sh;
-}
-
-/** Lee la fila de encabezados y avisa si falta alguna columna esperada. */
-function encabezados_(sh) {
-  var lastCol = sh.getLastColumn();
-  if (lastCol < 1) return { cols: [], faltan: COLUMNAS.slice() };
-  var cols = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(norm_);
-  var faltan = COLUMNAS.filter(function (c) { return cols.indexOf(c) < 0; });
-  return { cols: cols, faltan: faltan };
-}
-
-function tokenGuardado_() {
-  return PropertiesService.getScriptProperties().getProperty("TOKEN") || "";
-}
-
-/* ------------------------------------------------------------------ GET */
-
-function doGet(e) {
-  try {
-    var sh = hoja_();
-    var enc = encabezados_(sh);
-    var p = (e && e.parameter) || {};
-
-    // ?datos=1 → todas las filas como objetos {columna: valor}. Lo usa el panel
-    // (GitHub Pages): la planilla queda privada y la lee este script como dueño.
-    if (p.datos) {
-      var n = sh.getLastRow(), filas = [];
-      if (n > 1) {
-        var vals = sh.getRange(2, 1, n - 1, enc.cols.length).getValues();
-        vals.forEach(function (r) {
-          var o = {};
-          enc.cols.forEach(function (c, i) {
-            var v = r[i];
-            if (v instanceof Date) v = Utilities.formatDate(v, "America/Argentina/Tucuman", "yyyy-MM-dd");
-            if (c) o[c] = txt_(v);
-          });
-          if (txt_(o.objeto) || txt_(o.organismo)) filas.push(o);
-        });
-      }
-      return json_({ ok: true, columnas: enc.cols, faltan: enc.faltan, filas: filas,
-                     actualizado: new Date().toISOString() });
-    }
-
-    // ?smt=1 → reenvia la API de contrataciones de la Municipalidad de San Miguel
-    // de Tucuman. La rutina cloud no llega a ese host (puerto 5001, conexion
-    // reseteada por el proxy de salida); Apps Script si.
-    if (p.smt) {
-      var r = UrlFetchApp.fetch("https://estadisticas.smt.gob.ar:5001/admin/listarContratacion",
-                                { muteHttpExceptions: true, validateHttpsCertificates: false });
-      var out = ContentService.createTextOutput(r.getContentText());
-      out.setMimeType(ContentService.MimeType.JSON);
-      return out;
-    }
-
-    return json_({
-      ok: enc.faltan.length === 0,
-      columnas: enc.cols,
-      faltan: enc.faltan,
-      filas: Math.max(0, sh.getLastRow() - 1),
-      token_configurado: !!tokenGuardado_()
-    });
-  } catch (err) {
-    return json_({ ok: false, error: String(err) });
+function reenviar_(metodo, e) {
+  var url = DESTINO + (e && e.queryString ? '?' + e.queryString : '');
+  var opciones = { method: metodo, muteHttpExceptions: true, followRedirects: true };
+  if (metodo === 'post') {
+    opciones.contentType = (e.postData && e.postData.type) || 'text/plain;charset=utf-8';
+    opciones.payload = (e.postData && e.postData.contents) || '';
   }
-}
-
-/* ------------------------------------------------------------------ POST */
-
-function doPost(e) {
-  var body;
-  try {
-    body = JSON.parse(e && e.postData && e.postData.contents || "{}");
-  } catch (err) {
-    return json_({ ok: false, error: "El cuerpo no es JSON valido" });
+  var r;
+  try { r = UrlFetchApp.fetch(url, opciones); }
+  catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'No se pudo llegar al servidor. Probá de nuevo en un momento.' })).setMimeType(ContentService.MimeType.JSON);
   }
-
-  var guardado = tokenGuardado_();
-
-  // Configuracion inicial: solo si todavia no hay token.
-  if (body.accion === "configurar") {
-    if (guardado) return json_({ ok: false, error: "Ya hay un token configurado" });
-    var nuevo = txt_(body.token);
-    if (nuevo.length < 24) return json_({ ok: false, error: "Token demasiado corto" });
-    PropertiesService.getScriptProperties().setProperty("TOKEN", nuevo);
-    return json_({ ok: true, mensaje: "Token configurado" });
-  }
-
-  if (!guardado) return json_({ ok: false, error: "El script todavia no tiene token configurado" });
-  if (txt_(body.token) !== guardado) return json_({ ok: false, error: "Token invalido" });
-
-  var filas = body.filas;
-  if (!Array.isArray(filas) || !filas.length) {
-    return json_({ ok: false, error: "Falta 'filas' (lista de objetos)" });
-  }
-
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    var sh = hoja_();
-    var enc = encabezados_(sh);
-    if (enc.faltan.length) {
-      return json_({ ok: false, error: "A la planilla le faltan columnas", faltan: enc.faltan });
-    }
-
-    if (body.accion === "actualizar") return actualizar_(sh, enc, filas, !!body.simular);
-
-    // Indice de lo ya cargado para no duplicar.
-    var existentes = [];
-    var n = sh.getLastRow();
-    if (n > 1) existentes = sh.getRange(2, 1, n - 1, enc.cols.length).getValues();
-    var iOrg = enc.cols.indexOf("organismo"), iNum = enc.cols.indexOf("numero"),
-        iObj = enc.cols.indexOf("objeto"),    iApe = enc.cols.indexOf("fecha_apertura");
-    var claves = {};
-    existentes.forEach(function (r) { claveDe_(r[iOrg], r[iNum], r[iObj], r[iApe]).forEach(function (k) { claves[k] = 1; }); });
-
-    var hoy = Utilities.formatDate(new Date(), "America/Argentina/Tucuman", "yyyy-MM-dd");
-    var nuevas = [], duplicadas = 0, descartadas = [];
-
-    filas.forEach(function (f, idx) {
-      if (!f || typeof f !== "object") { descartadas.push({ fila: idx, motivo: "no es un objeto" }); return; }
-      var o = {};
-      Object.keys(f).forEach(function (k) { o[norm_(k).replace(/ /g, "_")] = f[k]; });
-
-      if (!txt_(o.objeto) && !txt_(o.organismo)) {
-        descartadas.push({ fila: idx, motivo: "sin objeto ni organismo" }); return;
-      }
-      var ks = claveDe_(o.organismo, o.numero, o.objeto, o.fecha_apertura);
-      if (ks.some(function (k) { return claves[k]; })) { duplicadas++; return; }
-      ks.forEach(function (k) { claves[k] = 1; });
-
-      if (!txt_(o.fecha_deteccion)) o.fecha_deteccion = hoy;
-      if (!txt_(o.estado_seguimiento)) o.estado_seguimiento = "nuevo";
-
-      nuevas.push(enc.cols.map(function (c) { return c ? txt_(o[c]) : ""; }));
-    });
-
-    if (body.simular) {
-      return json_({ ok: true, simulado: true, agregadas: nuevas.length, duplicadas: duplicadas,
-                     descartadas: descartadas, previa: nuevas });
-    }
-    if (nuevas.length) {
-      sh.getRange(sh.getLastRow() + 1, 1, nuevas.length, enc.cols.length).setValues(nuevas);
-      try { avisarNuevas_(nuevas, enc.cols); } catch (eAv) { console.warn('aviso app INGECO: ' + eAv); }
-    }
-    return json_({ ok: true, agregadas: nuevas.length, duplicadas: duplicadas, descartadas: descartadas });
-  } catch (err) {
-    return json_({ ok: false, error: String(err) });
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-/**
- * accion "actualizar": completa filas ya cargadas (por ejemplo las que
- * quedaron con objeto en blanco porque el boletin no se pudo leer).
- * Cada fila trae "organismo" y "numero" para ubicar la existente; el resto
- * de las claves pisa esa celda. Se busca por organismo+numero exactos
- * (normalizados) y, si no hay, por organismo igual y numero contenido en el
- * cargado (asi "93/2026" encuentra "Direccion de Vialidad de Salta N 93/2026").
- * Nunca crea filas ni borra celdas: una clave con valor vacio se ignora.
- */
-function actualizar_(sh, enc, filas, simular) {
-  var n = sh.getLastRow();
-  var existentes = n > 1 ? sh.getRange(2, 1, n - 1, enc.cols.length).getValues() : [];
-  var iOrg = enc.cols.indexOf("organismo"), iNum = enc.cols.indexOf("numero");
-  var actualizadas = 0, sinMatch = [], cambios = [];
-
-  filas.forEach(function (f, idx) {
-    if (!f || typeof f !== "object") { sinMatch.push({ fila: idx, motivo: "no es un objeto" }); return; }
-    var o = {};
-    Object.keys(f).forEach(function (k) { o[norm_(k).replace(/ /g, "_")] = f[k]; });
-    var org = norm_(o.organismo), num = norm_(o.numero);
-    if (!org || !num) { sinMatch.push({ fila: idx, motivo: "faltan organismo o numero" }); return; }
-
-    var r = -1;
-    for (var i = 0; i < existentes.length && r < 0; i++) {
-      if (norm_(existentes[i][iOrg]) === org && norm_(existentes[i][iNum]) === num) r = i;
-    }
-    for (var j = 0; j < existentes.length && r < 0; j++) {
-      if (norm_(existentes[j][iOrg]) === org && norm_(existentes[j][iNum]).indexOf(num) >= 0) r = j;
-    }
-    if (r < 0) { sinMatch.push({ fila: idx, motivo: "no existe", organismo: o.organismo, numero: o.numero }); return; }
-
-    var tocadas = [];
-    enc.cols.forEach(function (c, ci) {
-      if (!c || c === "organismo" || c === "numero") return;
-      if (!(c in o) || !txt_(o[c])) return;
-      if (!simular) sh.getRange(r + 2, ci + 1).setValue(txt_(o[c]));
-      existentes[r][ci] = txt_(o[c]);
-      tocadas.push(c);
-    });
-    actualizadas++;
-    cambios.push({ fila_planilla: r + 2, numero: txt_(existentes[r][iNum]), campos: tocadas });
-  });
-
-  return json_({ ok: true, simulado: !!simular, actualizadas: actualizadas, sin_match: sinMatch, cambios: cambios });
-}
-
-/** Claves de duplicado: (organismo+numero) y (objeto+fecha_apertura). */
-function claveDe_(org, num, obj, ape) {
-  var ks = [];
-  if (txt_(org) && txt_(num)) ks.push("on|" + norm_(org) + "|" + norm_(num));
-  if (txt_(obj) && txt_(ape)) ks.push("oa|" + norm_(obj) + "|" + norm_(ape));
-  return ks;
-}
-
-/* --------------------------------------------------------- uso manual */
-
-/**
- * Correr UNA vez desde el editor para autorizar el script (pide permiso
- * de Sheets). Solo verifica que puede leer la planilla.
- */
-function verificar() {
-  var sh = hoja_();
-  var enc = encabezados_(sh);
-  Logger.log("Hoja: %s | filas: %s | faltan: %s | token: %s",
-    sh.getName(), sh.getLastRow() - 1, enc.faltan.join(",") || "ninguna",
-    tokenGuardado_() ? "configurado" : "PENDIENTE");
-}
-
-/**
- * Correr UNA vez desde el editor para autorizar el permiso de red
- * (script.external_request) que usa el reenvio ?smt=1.
- */
-function probarSMT() {
-  var r = UrlFetchApp.fetch("https://estadisticas.smt.gob.ar:5001/admin/listarContratacion",
-                            { muteHttpExceptions: true, validateHttpsCertificates: false });
-  Logger.log("HTTP %s, %s bytes", r.getResponseCode(), r.getContentText().length);
-}
-
-/** Por si hay que rotar el token: borra el actual, despues se vuelve a 'configurar' por POST. */
-function borrarToken() {
-  PropertiesService.getScriptProperties().deleteProperty("TOKEN");
-  Logger.log("Token borrado");
-}
-
-
-/* ------------------------------------------------ Avisos por la app INGECO */
-var APP_INGECO_BACKEND_ = 'https://script.google.com/macros/s/AKfycbx9NN1FfOQjUjfymLXrMyd2QM6l96HP0lxY6RC7_xKsbDlO0PnwdHbaMtag54VYFor0/exec';
-var PANEL_URL_ = 'https://marcoskatz-cmd.github.io/licitaciones-noa/';
-
-/** Un aviso por cada licitación nueva, a todos los que tienen el módulo Licitaciones (y admins). */
-function avisarNuevas_(nuevas, cols) {
-  var clave = PropertiesService.getScriptProperties().getProperty('CLAVE_LICITACIONES');
-  if (!clave) return;
-  var ix = function (c) { return cols.indexOf(c); };
-  nuevas.forEach(function (r) {
-    var objeto = r[ix('objeto')] || '(sin objeto)', org = r[ix('organismo')] || '', num = r[ix('numero')] || '';
-    var apertura = r[ix('fecha_apertura')] || '', pres = r[ix('presupuesto_oficial')] || '', mon = r[ix('moneda')] || '';
-    var prov = r[ix('provincia_obra')] || '', url = r[ix('url')] || '';
-    var titulo = 'Licitación nueva: ' + String(objeto).slice(0, 90);
-    var cuerpo = [org + (num ? ' · ' + num : ''), prov, apertura ? 'Apertura ' + apertura : '', pres ? 'Presupuesto ' + (mon ? mon + ' ' : '$') + pres : ''].filter(Boolean).join(' · ');
-    try {
-      UrlFetchApp.fetch(APP_INGECO_BACKEND_, {
-        method: 'post', contentType: 'text/plain;charset=utf-8', muteHttpExceptions: true,
-        payload: JSON.stringify({
-          accion: 'notificar', clave_sistema: clave, modulo: 'LICITACIONES',
-          destinatarios: [{ con_modulo: 'LICITACIONES' }, { admin: true }], tipo: 'aviso_general', prioridad: 'normal',
-          titulo: titulo, cuerpo: cuerpo, url_destino: url || PANEL_URL_,
-          clave_unica: 'lic-' + norm_(org) + '|' + norm_(num || objeto), dias_unica: 365
-        })
-      });
-    } catch (e) { console.warn('aviso licitación: ' + e); }
-  });
+  var tipo = String((r.getHeaders() || {})['Content-Type'] || '');
+  if (tipo.indexOf('text/html') === 0) return HtmlService.createHtmlOutput(r.getContentText());
+  return ContentService.createTextOutput(r.getContentText()).setMimeType(ContentService.MimeType.JSON);
 }
