@@ -181,7 +181,10 @@
 
 <script>
 /* ------------------------------------------------------------------ config */
-var API = "https://script.google.com/macros/s/AKfycbywxmntSoySlvqSpEIye9b4S1CXamxsQeq0BCCGQqyqJxS6J92FwTAsPzFZVJAkolYg/exec";
+// Desde el 19-nov-2026 los datos salen de la plataforma INGECO (Vercel + Neon), no de Apps Script.
+// Para volver atrás: restaurar la URL anterior, que sigue desplegada:
+// https://script.google.com/macros/s/AKfycbywxmntSoySlvqSpEIye9b4S1CXamxsQeq0BCCGQqyqJxS6J92FwTAsPzFZVJAkolYg/exec
+var API = "https://ingeco-plataforma.vercel.app/api/licitaciones";
 
 /* ------------------------------------------------------------------ estado */
 var ROWS = [], VIEW = [], SORT = { k: "fecha_apertura", dir: 1 };
